@@ -7,6 +7,16 @@ db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
 db.exec(`
+  -- Driver OTP sessions
+  CREATE TABLE IF NOT EXISTS driver_otps (
+    id TEXT PRIMARY KEY,
+    driver_id TEXT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
+    otp TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   -- Tenants (clients)
   CREATE TABLE IF NOT EXISTS tenants (
     id TEXT PRIMARY KEY,
@@ -48,6 +58,7 @@ db.exec(`
     driver_type TEXT NOT NULL DEFAULT 'in-house',
     max_concurrent_orders INTEGER NOT NULL DEFAULT 3,
     active INTEGER NOT NULL DEFAULT 1,
+    fcm_token TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -147,5 +158,8 @@ if (tenantCount === 0) {
     db.prepare(`INSERT INTO order_status_history (id, order_id, status) VALUES (?, ?, ?)`).run(uuidv4(), oid, 'Unassigned');
   }
 }
+
+// Migrations for existing databases
+try { db.exec(`ALTER TABLE drivers ADD COLUMN fcm_token TEXT`); } catch {}
 
 module.exports = db;
