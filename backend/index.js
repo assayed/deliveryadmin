@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const app = express();
 
 app.use(cors());
@@ -27,6 +28,11 @@ app.use('/api/driver/auth', driverAuthRouter);
 app.use('/api/driver', driverAppRouter);
 
 app.get('/api/health', (_, res) => res.json({ ok: true }));
+
+// Serve built React frontend
+const FRONTEND_BUILD = path.join(__dirname, '../frontend/build');
+app.use(express.static(FRONTEND_BUILD));
+app.get('/{*path}', (req, res) => res.sendFile(path.join(FRONTEND_BUILD, 'index.html')));
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
