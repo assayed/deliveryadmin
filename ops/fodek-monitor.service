@@ -1,0 +1,11 @@
+[Unit]
+Description=FODEK container & endpoint health check
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/fodek-monitor.env
+ExecStart=/usr/local/bin/container-healthcheck.sh
+# Don't let a slow probe pile up; the timer fires every minute.
+TimeoutStartSec=120
