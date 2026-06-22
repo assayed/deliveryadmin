@@ -91,4 +91,82 @@ router.get('/financial', (req, res) => {
   res.json({ rows, summary });
 });
 
+// Best route report per driver
+// Returns active drivers with their current Assigned/Picked Up orders
+// sorted by nearest-neighbour Haversine from branch/centroid start point
+router.get('/routes', (req, res) => {
+  const tid = req.params.tenantId;
+
+  const drivers = db.prepare(`
+    SELECT d.id, d.name, d.phone, d.vehicle_type,
+      b.name as branch_name, b.address as branch_address
+    FROM drivers d
+    LEFT JOIN branches b ON b.id = (
+      SELECT branch_id FROM orders WHERE driver_id = d.id AND status IN ('Assigned','Picked Up') LIMIT 1
+    )
+    WHERE d.tenant_id = ? AND d.active = 1
+  `).all(tid);
+
+  function haversine([lat1, lon1], [lat2, lon2]) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  function centroid(coordsJson) {
+    try {
+      const pts = JSON.parse(coordsJson);
+      if (!pts.length) return null;
+      return [pts.reduce((s,p)=>s+p[0],0)/pts.length, pts.reduce((s,p)=>s+p[1],0)/pts.length];
+    } catch { return null; }
+  }
+
+  function nearestNeighbour(orders, start) {
+    const remaining = [...orders];
+    const sorted = [];
+    let current = start;
+    while (remaining.length) {
+      let best = null, bestDist = Infinity, bestIdx = 0;
+      remaining.forEach((o, i) => {
+        if (!o._coords) return;
+        const d = haversine(current, o._coords);
+        if (d < bestDist) { bestDist = d; best = o; bestIdx = i; }
+      });
+      if (!best) { sorted.push(...remaining); break; }
+      sorted.push({ ...best, dist_km: +bestDist.toFixed(2) });
+      remaining.splice(bestIdx, 1);
+      current = best._coords;
+    }
+    return sorted;
+  }
+
+  const result = drivers.map(driver => {
+    const orders = db.prepare(`
+      SELECT o.*, z.name as zone_name, z.coordinates
+      FROM orders o
+      LEFT JOIN zones z ON z.id = o.zone_id
+      WHERE o.driver_id = ? AND o.status IN ('Assigned','Picked Up')
+      ORDER BY o.created_at
+    `).all(driver.id).map(o => ({ ...o, _coords: centroid(o.coordinates) }));
+
+    if (!orders.length) return { ...driver, orders: [], total_distance_km: 0 };
+
+    // Use Riyadh city centre as default start if no branch coords available
+    const start = [24.7136, 46.6753];
+    const sorted = nearestNeighbour(orders, start);
+    const totalDist = sorted.reduce((s, o) => s + (o.dist_km || 0), 0);
+
+    return {
+      ...driver,
+      order_count: sorted.length,
+      total_distance_km: +totalDist.toFixed(2),
+      orders: sorted.map(({ _coords, coordinates, ...rest }) => rest),
+    };
+  }).filter(d => d.order_count > 0);
+
+  res.json(result);
+});
+
 module.exports = router;

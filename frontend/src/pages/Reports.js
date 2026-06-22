@@ -223,12 +223,130 @@ function FinancialTab({ tenant }) {
   );
 }
 
+function RouteTab({ tenant }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [expanded, setExpanded] = useState(null);
+
+  const run = async () => {
+    setLoading(true);
+    try { setData(await api.getRouteReport(tenant.id)); }
+    catch(e) { alert(e.response?.data?.error || 'Failed to load route report'); }
+    setLoading(false);
+  };
+
+  useEffect(() => { run(); }, []);
+
+  const SBADGE = {
+    Assigned: 'adm-badge-assigned', 'Picked Up': 'adm-badge-pickup',
+  };
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#fff',padding:'12px 18px',borderRadius:12,border:'1px solid #E2E9E4'}}>
+        <div>
+          <div style={{fontFamily:"'Sora',sans-serif",fontSize:14,fontWeight:700}}>Best Route Per Driver</div>
+          <div style={{fontSize:12.5,color:'#6B7F74',fontWeight:600,marginTop:2}}>Nearest-neighbour optimised route for drivers with active orders (Assigned / Picked Up)</div>
+        </div>
+        <button className="adm-btn adm-btn-ghost" style={{gap:6}} onClick={run} disabled={loading}>
+          <svg width={13} height={13} viewBox="0 0 20 20" fill="currentColor"><path d="M10 3a7 7 0 100 14A7 7 0 0010 3zm-1 4l3 3-3 3V7zm-2 3a5 5 0 118.66 2.5l-1.41-1.42A3 3 0 107 10H5z"/></svg>
+          {loading ? 'Loading…' : 'Refresh'}
+        </button>
+      </div>
+
+      {data && data.length === 0 && (
+        <div className="adm-empty" style={{height:'30vh'}}>
+          <div className="adm-empty-title">No active deliveries</div>
+          <div style={{fontSize:12.5,color:'#9EB3A6'}}>No drivers have Assigned or Picked Up orders right now</div>
+        </div>
+      )}
+
+      {data && data.map((driver, di) => (
+        <div key={driver.id} className="adm-card" style={{overflow:'hidden'}}>
+          {/* Driver header */}
+          <div style={{padding:'14px 18px',display:'flex',alignItems:'center',gap:14,cursor:'pointer',background: expanded===driver.id?'#F8FAF9':'#fff'}}
+            onClick={()=>setExpanded(e=>e===driver.id?null:driver.id)}>
+            <div className="adm-avatar" style={{background:avatarColor(driver.name),width:42,height:42,fontSize:15,flexShrink:0}}>{initials(driver.name)}</div>
+            <div style={{flex:1}}>
+              <div style={{fontFamily:"'Sora',sans-serif",fontSize:14.5,fontWeight:700,color:'#122B1D'}}>{driver.name}</div>
+              <div style={{fontSize:12.5,color:'#6B7F74',fontWeight:600,display:'flex',gap:10,marginTop:2}}>
+                <span>{driver.vehicle_type}</span>
+                {driver.phone && <span>·</span>}
+                {driver.phone && <span>{driver.phone}</span>}
+              </div>
+            </div>
+            <div style={{display:'flex',gap:20,alignItems:'center'}}>
+              <div style={{textAlign:'center'}}>
+                <div style={{fontFamily:"'Sora',sans-serif",fontSize:22,fontWeight:800,color:'#0B5132'}}>{driver.order_count}</div>
+                <div style={{fontSize:11,fontWeight:700,color:'#9EB3A6',textTransform:'uppercase',letterSpacing:'.06em'}}>stops</div>
+              </div>
+              <div style={{textAlign:'center'}}>
+                <div style={{fontFamily:"'Sora',sans-serif",fontSize:22,fontWeight:800,color:'#156A8C'}}>{driver.total_distance_km}</div>
+                <div style={{fontSize:11,fontWeight:700,color:'#9EB3A6',textTransform:'uppercase',letterSpacing:'.06em'}}>km est.</div>
+              </div>
+              <svg width={16} height={16} viewBox="0 0 12 12" fill="none" stroke="#9EB3A6" strokeWidth="2" strokeLinecap="round"
+                style={{transform: expanded===driver.id?'rotate(180deg)':'rotate(0deg)',transition:'.2s'}}>
+                <path d="M2 4l4 4 4-4"/>
+              </svg>
+            </div>
+          </div>
+
+          {/* Stop list */}
+          {expanded === driver.id && (
+            <div style={{borderTop:'1px solid #E2E9E4'}}>
+              {driver.orders.map((o, i) => (
+                <div key={o.id} style={{display:'flex',alignItems:'flex-start',gap:14,padding:'12px 20px',borderBottom:'1px solid #F4F6F5',background:i%2===0?'#fff':'#FAFCFA'}}>
+                  {/* Step number */}
+                  <div style={{width:28,height:28,borderRadius:'50%',background:i===0?'#0B5132':'#E7F0EB',color:i===0?'#fff':'#0B5132',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:800,flexShrink:0,marginTop:2}}>
+                    {i + 1}
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:3}}>
+                      <span style={{fontFamily:"'Sora',sans-serif",fontSize:13,fontWeight:700,color:'#6B7F74',letterSpacing:'.08em'}}>{o.order_ref}</span>
+                      <span className={`adm-badge ${SBADGE[o.status]||'adm-badge-inactive'}`} style={{fontSize:10}}>{o.status}</span>
+                      {o.free_delivery ? <span className="adm-badge adm-badge-active" style={{fontSize:10}}>Free</span> : null}
+                    </div>
+                    <div style={{fontFamily:"'Sora',sans-serif",fontSize:13.5,fontWeight:700,marginBottom:2}}>{o.customer_name}</div>
+                    <div style={{fontSize:12.5,color:'#6B7F74',fontWeight:600,display:'flex',gap:8,flexWrap:'wrap'}}>
+                      <span>📍 {o.customer_address}</span>
+                      {o.zone_name && <span className="adm-zone-chip" style={{fontSize:11}}>{o.zone_name}</span>}
+                    </div>
+                    {o.notes && <div style={{fontSize:12,color:'#9EB3A6',fontWeight:600,marginTop:3}}>📝 {o.notes}</div>}
+                  </div>
+                  <div style={{textAlign:'right',flexShrink:0}}>
+                    {o.dist_km != null && o.dist_km > 0 && (
+                      <div style={{fontSize:12,fontWeight:800,color:'#156A8C'}}>+{o.dist_km} km</div>
+                    )}
+                    <div style={{fontSize:11.5,color:'#9EB3A6',fontWeight:600}}>{o.customer_phone}</div>
+                  </div>
+                </div>
+              ))}
+              <div style={{padding:'10px 20px',background:'#F8FAF9',display:'flex',alignItems:'center',gap:10,fontSize:12.5,fontWeight:700,color:'#6B7F74'}}>
+                <svg width={14} height={14} viewBox="0 0 20 20" fill="currentColor" style={{color:'#0B5132'}}><path d="M4 15s0-4 4-4 8-4 8-8M4 15l-2-2m2 2l2-2"/></svg>
+                Total estimated route: <strong style={{color:'#0B5132'}}>{driver.total_distance_km} km</strong> across <strong style={{color:'#0B5132'}}>{driver.order_count} stops</strong>
+                <span style={{marginLeft:'auto',fontSize:11,color:'#9EB3A6'}}>Nearest-neighbour algorithm from Riyadh centre</span>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {!data && !loading && (
+        <div className="adm-empty" style={{height:'30vh'}}>
+          <div className="adm-empty-title">Click Refresh to load routes</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Reports({ tenant }) {
   const [tab, setTab] = useState('overview');
 
   const TABS = [
-    { id:'overview', label:'Operations Overview' },
+    { id:'overview',  label:'Operations Overview' },
     { id:'financial', label:'Financial Reconciliation' },
+    { id:'routes',    label:'Best Route by Driver' },
   ];
 
   return (
@@ -241,8 +359,9 @@ export default function Reports({ tenant }) {
           </button>
         ))}
       </div>
-      {tab==='overview' && <OverviewTab tenant={tenant}/>}
+      {tab==='overview'  && <OverviewTab tenant={tenant}/>}
       {tab==='financial' && <FinancialTab tenant={tenant}/>}
+      {tab==='routes'    && <RouteTab tenant={tenant}/>}
     </div>
   );
 }

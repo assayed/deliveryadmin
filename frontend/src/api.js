@@ -60,6 +60,7 @@ const api = {
   getReports:         (tid)        => axios.get(`${BASE}/tenants/${tid}/reports`).then(r => r.data),
   getFinancialReport: (tid, params) => axios.get(`${BASE}/tenants/${tid}/reports/financial`, { params }).then(r => r.data),
   getFinancialReportCsv: (tid, params) => axios.get(`${BASE}/tenants/${tid}/reports/financial`, { params: { ...params, format: 'csv' }, responseType: 'blob' }).then(r => r.data),
+  getRouteReport:       (tid)          => axios.get(`${BASE}/tenants/${tid}/reports/routes`).then(r => r.data),
 
   // Route optimization
   optimizeRoute:      (tid, data)  => axios.post(`${BASE}/tenants/${tid}/dispatch/route`, data).then(r => r.data),

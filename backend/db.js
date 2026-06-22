@@ -213,6 +213,49 @@ if (tenantCount === 0) {
     addOrder(ref, name, phone, addr, zone, branch, driver, 'Failed', failReasons[i], null,
       [['Unassigned', null], ['Assigned', null], ['Picked Up', null], ['Failed', failReasons[i]]]);
   }
+
+  // ── Time Slots ──
+  const { v4: uuid2 } = require('uuid');
+  const ts1 = uuid2(), ts2 = uuid2(), ts3 = uuid2(), ts4 = uuid2(), ts5 = uuid2(), ts6 = uuid2(), ts7 = uuid2(), ts8 = uuid2();
+  const insTs = db.prepare(`INSERT OR IGNORE INTO time_slots (id, tenant_id, name, day_of_week, start_time, end_time, active) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  // Sunday=0  (working day in SA)
+  insTs.run(ts1, t1, 'Morning – Sun',   0, '08:00', '12:00', 1);
+  insTs.run(ts2, t1, 'Afternoon – Sun', 0, '13:00', '17:00', 1);
+  insTs.run(ts3, t1, 'Morning – Mon',   1, '08:00', '12:00', 1);
+  insTs.run(ts4, t1, 'Afternoon – Mon', 1, '13:00', '17:00', 1);
+  insTs.run(ts5, t1, 'Morning – Tue',   2, '08:00', '12:00', 1);
+  insTs.run(ts6, t1, 'Afternoon – Tue', 2, '13:00', '17:00', 1);
+  insTs.run(ts7, t1, 'Morning – Wed',   3, '08:00', '12:00', 1);
+  insTs.run(ts8, t1, 'Afternoon – Wed', 3, '13:00', '17:00', 1);
+  // Thursday half-day
+  const ts9 = uuid2();
+  insTs.run(ts9, t1, 'Half-Day – Thu',  4, '08:00', '13:00', 1);
+  // Friday=5, Saturday=6 — off (no slots inserted)
+
+  // ── Companies ──
+  const { v4: uuid3 } = require('uuid');
+  const c1 = uuid3(), c2 = uuid3(), c3 = uuid3();
+  const insCo = db.prepare(`INSERT OR IGNORE INTO companies (id, tenant_id, name_en, name_ar, contact_person, email, order_price, free_delivery) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+  insCo.run(c1, t1, 'Swift Logistics',    'سويفت للوجستيك',  'Khalid Mansour',  'khalid@swift.sa',   15.00, 0);
+  insCo.run(c2, t1, 'Al-Amal Delivery',   'الأمل للتوصيل',  'Saad Al-Nasser',  'saad@alamal.sa',    12.50, 0);
+  insCo.run(c3, t1, 'Express Partners',   'شركاء السرعة',    'Reem Al-Otaibi',  'reem@express.sa',    0.00, 1);
+
+  // Link companies to zones
+  const insCz = db.prepare(`INSERT OR IGNORE INTO company_zones (company_id, zone_id) VALUES (?, ?)`);
+  insCz.run(c1, z1); insCz.run(c1, z2); insCz.run(c1, z5);
+  insCz.run(c2, z2); insCz.run(c2, z3); insCz.run(c2, z4);
+  insCz.run(c3, z1); insCz.run(c3, z3); insCz.run(c3, z4); insCz.run(c3, z5);
+
+  // Link companies to time slots
+  const insCts = db.prepare(`INSERT OR IGNORE INTO company_time_slots (company_id, time_slot_id) VALUES (?, ?)`);
+  insCts.run(c1, ts1); insCts.run(c1, ts2); insCts.run(c1, ts3); insCts.run(c1, ts4);
+  insCts.run(c2, ts3); insCts.run(c2, ts4); insCts.run(c2, ts5); insCts.run(c2, ts6);
+  insCts.run(c3, ts1); insCts.run(c3, ts3); insCts.run(c3, ts5); insCts.run(c3, ts7); insCts.run(c3, ts9);
+
+  // Assign external drivers (d6, d8) to Swift Logistics; d3 to Al-Amal
+  db.prepare(`UPDATE drivers SET company_id = ? WHERE id = ?`).run(c1, d6);
+  db.prepare(`UPDATE drivers SET company_id = ? WHERE id = ?`).run(c1, d8);
+  db.prepare(`UPDATE drivers SET company_id = ? WHERE id = ?`).run(c2, d3);
 }
 
 // ── Migrations for existing databases ──
