@@ -215,7 +215,88 @@ if (tenantCount === 0) {
   }
 }
 
-// Migrations for existing databases
+// ── Migrations for existing databases ──
 try { db.exec(`ALTER TABLE drivers ADD COLUMN fcm_token TEXT`); } catch {}
+try { db.exec(`ALTER TABLE drivers ADD COLUMN company_id TEXT REFERENCES companies(id)`); } catch {}
+try { db.exec(`ALTER TABLE zones ADD COLUMN coordinates TEXT`); } catch {}
+try { db.exec(`ALTER TABLE zones ADD COLUMN branch_id TEXT REFERENCES branches(id)`); } catch {}
+try { db.exec(`ALTER TABLE orders ADD COLUMN time_slot_id TEXT REFERENCES time_slots(id)`); } catch {}
+try { db.exec(`ALTER TABLE orders ADD COLUMN free_delivery INTEGER NOT NULL DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE branches ADD COLUMN phone TEXT`); } catch {}
+try { db.exec(`ALTER TABLE branches ADD COLUMN manager_name TEXT`); } catch {}
+
+// ── New tables ──
+db.exec(`
+  CREATE TABLE IF NOT EXISTS time_slots (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS companies (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    name_ar TEXT NOT NULL,
+    name_en TEXT NOT NULL,
+    contact_person TEXT,
+    email TEXT,
+    order_price REAL NOT NULL DEFAULT 0,
+    free_delivery INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS company_zones (
+    company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    zone_id TEXT NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
+    PRIMARY KEY (company_id, zone_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS company_time_slots (
+    company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    time_slot_id TEXT NOT NULL REFERENCES time_slots(id) ON DELETE CASCADE,
+    PRIMARY KEY (company_id, time_slot_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS driver_time_slots (
+    driver_id TEXT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
+    time_slot_id TEXT NOT NULL REFERENCES time_slots(id) ON DELETE CASCADE,
+    PRIMARY KEY (driver_id, time_slot_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    order_id TEXT REFERENCES orders(id) ON DELETE SET NULL,
+    action TEXT NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    performed_by TEXT NOT NULL DEFAULT 'admin',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    driver_id TEXT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,
+    message TEXT NOT NULL,
+    order_id TEXT REFERENCES orders(id) ON DELETE SET NULL,
+    read INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS order_images (
+    id TEXT PRIMARY KEY,
+    order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    uploaded_by TEXT NOT NULL DEFAULT 'admin',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
 
 module.exports = db;

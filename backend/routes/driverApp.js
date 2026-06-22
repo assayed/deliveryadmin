@@ -99,12 +99,26 @@ router.post('/orders/:id/status', (req, res) => {
   res.json(enrichOrder(db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id)));
 });
 
-// GET /api/driver/orders/history — completed/failed orders (last 30 days)
+// GET /api/driver/history — completed/failed orders (last 30 days)
 router.get('/history', (req, res) => {
   const orders = db.prepare(
     `SELECT * FROM orders WHERE driver_id = ? AND status IN ('Delivered','Failed') AND updated_at >= datetime('now','-30 days') ORDER BY updated_at DESC`
   ).all(req.driver.driver_id).map(enrichOrder);
   res.json(orders);
+});
+
+// GET /api/driver/notifications
+router.get('/notifications', (req, res) => {
+  const notes = db.prepare(
+    `SELECT n.*, o.order_ref FROM notifications n LEFT JOIN orders o ON o.id = n.order_id WHERE n.driver_id = ? ORDER BY n.created_at DESC LIMIT 50`
+  ).all(req.driver.driver_id);
+  res.json(notes);
+});
+
+// POST /api/driver/notifications/:id/read
+router.post('/notifications/:id/read', (req, res) => {
+  db.prepare('UPDATE notifications SET read = 1 WHERE id = ? AND driver_id = ?').run(req.params.id, req.driver.driver_id);
+  res.json({ ok: true });
 });
 
 module.exports = router;

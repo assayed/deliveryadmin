@@ -13,17 +13,18 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { name, address, zone_id } = req.body;
+  const { name, address, zone_id, phone, manager_name } = req.body;
   if (!name) return res.status(400).json({ error: 'name required' });
   const id = uuidv4();
-  db.prepare('INSERT INTO branches (id, tenant_id, name, address, zone_id) VALUES (?, ?, ?, ?, ?)').run(id, req.params.tenantId, name, address || null, zone_id || null);
+  db.prepare('INSERT INTO branches (id, tenant_id, name, address, zone_id, phone, manager_name) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(id, req.params.tenantId, name, address || null, zone_id || null, phone || null, manager_name || null);
   res.status(201).json(db.prepare('SELECT b.*, z.name as zone_name FROM branches b LEFT JOIN zones z ON z.id = b.zone_id WHERE b.id = ?').get(id));
 });
 
 router.put('/:id', (req, res) => {
-  const { name, address, zone_id, active } = req.body;
-  db.prepare('UPDATE branches SET name = ?, address = ?, zone_id = ?, active = ? WHERE id = ? AND tenant_id = ?')
-    .run(name, address || null, zone_id || null, active !== undefined ? active : 1, req.params.id, req.params.tenantId);
+  const { name, address, zone_id, active, phone, manager_name } = req.body;
+  db.prepare('UPDATE branches SET name = ?, address = ?, zone_id = ?, active = ?, phone = ?, manager_name = ? WHERE id = ? AND tenant_id = ?')
+    .run(name, address || null, zone_id || null, active !== undefined ? active : 1, phone || null, manager_name || null, req.params.id, req.params.tenantId);
   res.json(db.prepare('SELECT b.*, z.name as zone_name FROM branches b LEFT JOIN zones z ON z.id = b.zone_id WHERE b.id = ?').get(req.params.id));
 });
 

@@ -48,11 +48,13 @@ function avatarColor(name) {
   return AVATAR_COLORS[h];
 }
 
-const EMPTY_FORM = { name:'', phone:'', vehicle_type:'Motorcycle', driver_type:'in-house', max_concurrent_orders:3, active:1, zone_ids:[] };
+const EMPTY_FORM = { name:'', phone:'', vehicle_type:'Motorcycle', driver_type:'in-house', max_concurrent_orders:3, active:1, zone_ids:[], company_id:'', time_slot_ids:[] };
 
 export default function Drivers({ tenant }) {
   const [drivers, setDrivers] = useState([]);
   const [zones, setZones] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [timeSlots, setTimeSlots] = useState([]);
   const [search, setSearch] = useState('');
   const [filterZone, setFilterZone] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -64,17 +66,20 @@ export default function Drivers({ tenant }) {
   const load = useCallback(() => Promise.all([
     api.getDrivers(tenant.id).then(setDrivers),
     api.getZones(tenant.id).then(setZones),
+    api.getCompanies(tenant.id).then(setCompanies),
+    api.getTimeSlots(tenant.id).then(setTimeSlots),
   ]), [tenant.id]);
   useEffect(() => { load(); }, [load]);
 
   const openAdd = () => { setForm(EMPTY_FORM); setError(''); setDrawer('add'); };
   const openEdit = d => {
-    setForm({ name:d.name, phone:d.phone, vehicle_type:d.vehicle_type, driver_type:d.driver_type, max_concurrent_orders:d.max_concurrent_orders, active:d.active, zone_ids:d.zones.map(z=>z.id) });
+    setForm({ name:d.name, phone:d.phone, vehicle_type:d.vehicle_type, driver_type:d.driver_type, max_concurrent_orders:d.max_concurrent_orders, active:d.active, zone_ids:d.zones.map(z=>z.id), company_id:d.company_id||'', time_slot_ids:(d.time_slots||[]).map(t=>t.id) });
     setError(''); setDrawer(d);
   };
   const closeDrawer = () => setDrawer(null);
 
   const toggleZone = id => setForm(f => ({ ...f, zone_ids: f.zone_ids.includes(id) ? f.zone_ids.filter(z=>z!==id) : [...f.zone_ids, id] }));
+  const toggleSlot = id => setForm(f => ({ ...f, time_slot_ids: f.time_slot_ids.includes(id) ? f.time_slot_ids.filter(x=>x!==id) : [...f.time_slot_ids, id] }));
 
   const save = async () => {
     if (!form.name.trim()) return setError('Full name is required');
@@ -143,6 +148,7 @@ export default function Drivers({ tenant }) {
               <tr>
                 <th>Driver</th>
                 <th>Phone</th>
+                <th>Company</th>
                 <th>Zone(s)</th>
                 <th>Vehicle</th>
                 <th style={{textAlign:'center'}}>Max Orders</th>
@@ -165,6 +171,7 @@ export default function Drivers({ tenant }) {
                     </div>
                   </td>
                   <td style={{fontSize:13,color:'#3D5247',fontWeight:600}}>{d.phone}</td>
+                  <td style={{fontSize:12.5,color:'#3D5247'}}>{d.company?.name_en || <span style={{color:'#C8D8CF'}}>—</span>}</td>
                   <td>
                     <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
                       {d.zones.length ? d.zones.map(z=><span key={z.id} className="adm-zone-chip">{z.name}</span>) : <span style={{color:'#C8D8CF',fontSize:12}}>—</span>}
@@ -188,7 +195,7 @@ export default function Drivers({ tenant }) {
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={9}>
+                <tr><td colSpan={10}>
                   <div className="adm-empty"><div className="adm-empty-title">No drivers found</div><div style={{fontSize:12.5,color:'#9EB3A6'}}>Try adjusting your filters</div></div>
                 </td></tr>
               )}
@@ -257,6 +264,27 @@ export default function Drivers({ tenant }) {
                 <div style={{display:'flex',gap:8}}>
                   <span className={`adm-zone-sel${form.driver_type==='in-house'?' on':''}`} onClick={()=>setForm(f=>({...f,driver_type:'in-house'}))}>In-House</span>
                   <span className={`adm-zone-sel${form.driver_type==='hybrid'?' on':''}`} onClick={()=>setForm(f=>({...f,driver_type:'hybrid'}))}>Hybrid</span>
+                </div>
+              </div>
+              <div className="adm-field">
+                <span className="adm-field-lbl">Company (External)</span>
+                <div className="adm-field-select">
+                  <select value={form.company_id} onChange={e=>setForm(f=>({...f,company_id:e.target.value}))}>
+                    <option value="">No company (in-house)</option>
+                    {companies.map(c=><option key={c.id} value={c.id}>{c.name_en}</option>)}
+                  </select>
+                  <Chevron/>
+                </div>
+              </div>
+              <div className="adm-field">
+                <span className="adm-field-lbl">Time Slots</span>
+                <div style={{display:'flex',flexWrap:'wrap',gap:7,marginTop:2}}>
+                  {timeSlots.map(t=>(
+                    <span key={t.id} className={`adm-zone-sel${form.time_slot_ids.includes(t.id)?' on':''}`} onClick={()=>toggleSlot(t.id)}>
+                      {t.name} <span style={{opacity:.65,fontSize:11}}>({t.day_name})</span>
+                    </span>
+                  ))}
+                  {timeSlots.length===0 && <span style={{fontSize:12,color:'#9EB3A6'}}>No time slots defined</span>}
                 </div>
               </div>
               <div className="adm-field">
