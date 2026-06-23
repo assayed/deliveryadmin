@@ -1,6 +1,6 @@
 module.exports = {
   apps: [{
-    name: 'fodek-admin',
+    name: 'delivery-admin',
     script: './backend/index.js',
     cwd: '/var/www/fodek-admin',
     env: {
