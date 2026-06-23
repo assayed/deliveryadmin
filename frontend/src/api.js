@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BASE = (process.env.REACT_APP_API_URL || 'http://localhost:3001') + '/api';
+const BASE = (process.env.REACT_APP_API_URL || '') + '/api';
 
 const api = {
   // Tenants
